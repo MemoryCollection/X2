@@ -4,37 +4,24 @@
 
     <!-- 网络相关 -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- 访问网络 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- 获取网络状态 -->
 
-    <!-- 设备和系统相关 -->
-    <uses-permission android:name="android.permission.SET_WALLPAPER" />
-    <!-- 设置壁纸 -->
+    <!-- 设备功能 -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- 控制振动 -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- 请求安装APK -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- 保持屏幕/CPU唤醒 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- 使用前台服务 -->
+
+    <!-- 通知相关 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 发送通知（Android 13+） -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    <!-- 管理通知政策 -->
 
-    <!-- 存储相关 -->
+    <!-- 媒体访问（Android 13+ 已统一为 READ_MEDIA_* 权限） -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- 读取图片 -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <!-- 读取视频 -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <!-- 读取音频 -->
 
-    <!-- 全文件管理 -->
+    <!-- 全文件管理（仅在确实需要时才申请，需用户手动授权） -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <!-- 管理所有文件（需手动开启） -->
 
 
     <application

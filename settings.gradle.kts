@@ -40,3 +40,5 @@ dependencyResolutionManagement {
 // 3. 项目基础配置
 rootProject.name = "X2"
 include(":app")
+
+
