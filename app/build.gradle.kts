@@ -151,7 +151,7 @@ afterEvaluate {
 }
 
 dependencies {
-    implementation("com.github.ven-coder.Assists:assists-base:v3.2.203")
+    implementation("com.github.ven-coder.Assists:assists-base:v3.2.17")
     implementation("androidx.core:core-ktx:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
     implementation("androidx.activity:activity-compose:1.7.0")

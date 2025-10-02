@@ -1,66 +1,63 @@
 package cn.wi6.x2
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import cn.wi6.x2.ui.MainScreen
+import cn.wi6.x2.ui.PermissionStatusScreen
 import cn.wi6.x2.ui.theme.X2Theme
+import com.ven.assists.AssistsCore
+import android.provider.Settings
 
 class MainActivity : ComponentActivity() {
+    private var allPermissionsGranted by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setupContent()
+    }
 
+    override fun onResume() {
+        super.onResume()
+        checkPermissions()
+    }
+
+    private fun setupContent() {
         setContent {
             X2Theme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    PermissionStatusScreen(this)
-                }
+                PermissionScreenContent()
             }
         }
     }
-}
 
-@Composable
-fun PermissionStatusScreen(activity: ComponentActivity) {
-    var permissions by remember { mutableStateOf(PermissionUtils.getPermissionsStatus(activity)) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            text = "当前权限状态",
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        // 遍历权限状态
-        permissions.forEach { (name, granted) ->
-            Text(
-                text = "$name: ${if (granted) "已开启 ✅" else "未开启 ❌"}",
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    @Composable
+    private fun PermissionScreenContent() {
+        if (allPermissionsGranted) {
+            MainScreen()
+        } else {
+            PermissionStatusScreen(
+                activity = this,
+                onPermissionsUpdated = { checkPermissions() }
             )
         }
+    }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(onClick = {
-            PermissionUtils.requestAllNeededPermissions(activity)
-            permissions = PermissionUtils.getPermissionsStatus(activity)
-        }) {
-            Text("检查并申请权限")
+    private fun checkPermissions() {
+        allPermissionsGranted = checkAllPermissionsGranted()
+        // 如果权限状态变化，需要重新设置内容
+        if (!isFinishing && !isDestroyed) {
+            setupContent()
         }
     }
+
+    private fun checkAllPermissionsGranted(): Boolean {
+        return Permission.REQUIRED_PERMISSIONS.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        } && Settings.canDrawOverlays(this) &&
+                EnvironmentPermissionHelper.hasManageExternalStoragePermission() &&
+                AssistsCore.isAccessibilityServiceEnabled()
+    }
 }
-
-

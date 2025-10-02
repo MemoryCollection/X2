@@ -1,8 +1,6 @@
 package cn.wi6.x2
 
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
@@ -13,9 +11,9 @@ import android.Manifest
 import com.ven.assists.AssistsCore
 
 
-object PermissionUtils {
+object Permission {
 
-    private val REQUIRED_PERMISSIONS = arrayOf(
+    val REQUIRED_PERMISSIONS = arrayOf(
         Manifest.permission.INTERNET,
         Manifest.permission.ACCESS_NETWORK_STATE,
         Manifest.permission.VIBRATE,
