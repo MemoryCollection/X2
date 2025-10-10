@@ -1,5 +1,6 @@
 package cn.wi6.x2.wechat.sport
 
+import cn.wi6.x2.utils.randClicks
 import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.utils.XLog.e as XLogE
 import cn.wi6.x2.utils.XLog.d as XLog
@@ -9,12 +10,12 @@ import cn.wi6.x2.wechat.WeChatConfig.SPORT_FILTER_KEYWORD
 import cn.wi6.x2.wechat.WeChatConfig.SPORT_MIN_STEPS_THRESHOLD
 import cn.wi6.x2.wechat.WeChatConfig.SPORT_NAME
 import cn.wi6.x2.wechat.WeChatConfig.SPORT_NUMBER
-import com.ven.assists.AssistsCore.click
+import cn.wi6.x2.wechat.scrollListForward
 import com.ven.assists.AssistsCore.findById
 import com.ven.assists.AssistsCore.isVisible
-import com.ven.assists.AssistsCore.scrollForward
+
 // 运动点赞
-suspend fun SportsLikes() {
+suspend fun sportsLikes() {
     var skippedCount = 0
     var likedCount = 0
     var totalProcessed = 0
@@ -59,7 +60,6 @@ suspend fun SportsLikes() {
                 // 关键修改：检测到运动数＜1000，触发终止循环
                 val exerciseNumber = numberText.filter { it.isDigit() }.toLongOrNull() ?: 0L
                 when {
-                    // 1. 若包含"吴东"，无论步数多少都只跳过，不终止循环
                     sportName.contains(SPORT_FILTER_KEYWORD) -> {
                         XLog("跳过（包含关键词）：$sportName（运动数：$numberText）")
                         skippedCount++
@@ -78,21 +78,17 @@ suspend fun SportsLikes() {
 
                 // 执行点赞（正常逻辑）()
                 if(likeButton.isVisible()){
-                    likeButton.click()
+                    likeButton.randClicks()
                     likedCount++
                     processedElements.add(uniqueKey)
                     XLog("点赞成功：$sportName（运动数：$numberText）")
-                    randDelay()
+                    randDelay(500, 1100)
                 }
             }
 
-            // 若未触发终止，才滚动加载下一批；若已终止，直接跳过滚动
             if (!shouldStop) {
-                val sportsList = findById(LIST_OF_SPORTS).firstOrNull()
-                val scrollSuccess = sportsList?.scrollForward() == true
-                XLog("页面滚动状态：${if (scrollSuccess) "成功（加载下一批）" else "失败（已到最底部）"}")
-                randDelay()
-                if (!scrollSuccess) break // 滚动失败（无更多元素），终止循环
+                val canScroll = scrollListForward(LIST_OF_SPORTS)
+                if (!canScroll) break
             }
         }
 

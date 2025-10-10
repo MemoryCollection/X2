@@ -1,66 +1,33 @@
+package cn.wi6.x2.utils
+
+import android.os.Environment
 import java.io.File
 
 object FileUtils {
+    // 公共存储目录：/storage/emulated/0/X2
+    private const val APP_PUBLIC_DIR = "X2"
 
     /**
-     * 确保文件存在（没有就自动创建，包括目录）
+     * 获取应用公共存储目录
+     * 路径：/storage/emulated/0/X2
      */
-    fun ensureFile(filePath: String): File {
-        val file = File(filePath)
-        if (!file.parentFile.exists()) {
-            file.parentFile.mkdirs() // 创建目录
+    fun getPublicAppDir(): File? {
+        // 先检查存储权限和可写性
+        if (!isExternalStorageWritable() || !Permission.hasManageExternalStoragePermission()) {
+            return null
         }
-        if (!file.exists()) {
-            file.createNewFile() // 创建文件
-        }
-        return file
-    }
-
-    /**
-     * 读取文件内容（按行）
-     */
-    fun readLines(filePath: String): MutableList<String> {
-        val file = ensureFile(filePath)
-        return file.readLines().toMutableList()
-    }
-
-    /**
-     * 添加一行内容
-     */
-    fun appendLine(filePath: String, line: String) {
-        val file = ensureFile(filePath)
-        file.appendText(line + System.lineSeparator())
-    }
-
-    /**
-     * 修改指定行（下标从 0 开始）
-     */
-    fun updateLine(filePath: String, index: Int, newLine: String) {
-        val lines = readLines(filePath)
-        if (index in lines.indices) {
-            lines[index] = newLine
-            ensureFile(filePath).writeText(lines.joinToString(System.lineSeparator()))
+        val externalDir = Environment.getExternalStorageDirectory()
+        return File(externalDir, APP_PUBLIC_DIR).apply {
+            if (!exists()) {
+                mkdirs() // 递归创建目录
+            }
         }
     }
 
     /**
-     * 删除指定行
+     * 检查外部存储是否可写
      */
-    fun deleteLine(filePath: String, index: Int) {
-        val lines = readLines(filePath)
-        if (index in lines.indices) {
-            lines.removeAt(index)
-            ensureFile(filePath).writeText(lines.joinToString(System.lineSeparator()))
-        }
-    }
-
-    /**
-     * 查找包含指定文本的行号（从0开始），支持返回多个
-     */
-    fun findLineNumbers(filePath: String, keyword: String): List<Int> {
-        val lines = readLines(filePath)
-        return lines.mapIndexedNotNull { index, line ->
-            if (line.contains(keyword)) index else null
-        }
+    fun isExternalStorageWritable(): Boolean {
+        return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
     }
 }

@@ -1,9 +1,12 @@
 import java.util.Properties
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt") // Room 编译器支持
 }
 
 android {
@@ -12,28 +15,29 @@ android {
 
     defaultConfig {
         applicationId = "cn.wi6.x2"
-        minSdk = 34
+        minSdk = 24
         targetSdk = 34
 
-        // 1. 自动创建 version.properties + 默认值（保留正确逻辑）
+        // --- 自动创建 version.properties + 默认值 ---
         val versionPropsFile = rootProject.file("version.properties")
         val versionProps = Properties().apply {
             if (!versionPropsFile.exists()) {
-                versionPropsFile.createNewFile() // 不存在则创建文件
+                versionPropsFile.createNewFile()
                 setProperty("VERSION_NAME", "1.0.0.0") // 默认初始版本
-                store(versionPropsFile.outputStream(), "Auto-generated version config") // 写入注释
+                store(FileOutputStream(versionPropsFile), "Auto-generated version config")
             }
-            load(versionPropsFile.inputStream()) // 加载配置
+            load(FileInputStream(versionPropsFile))
         }
 
-        // 安全获取版本号（缺省时用默认值，避免空指针）
+        // 安全获取版本号
         val versionNameStr = versionProps.getProperty("VERSION_NAME", "1.0.0.0")
         versionName = versionNameStr
-        // 版本号转 versionCode（处理异常：若格式错误，默认用 10000）
+
+        // 版本号转 versionCode（处理异常）
         versionCode = try {
             versionNameStr.replace(".", "").toInt()
         } catch (e: Exception) {
-            println("版本号格式错误，使用默认 versionCode: 10000")
+            println("⚠️ 版本号格式错误，使用默认 versionCode: 10000")
             10000
         }
 
@@ -74,23 +78,22 @@ android {
     }
 }
 
-// 2. 关键修复：用 afterEvaluate 延迟绑定任务（确保 assembleRelease 已生成）
+// --- afterEvaluate: 延迟绑定 assembleRelease 任务 ---
 afterEvaluate {
-    // 安全获取 assembleRelease 任务（避免找不到任务时报错）
     val assembleReleaseTask = tasks.findByName("assembleRelease")
     assembleReleaseTask?.doLast {
-        // --- 版本号递增逻辑（仅执行1次，避免重复递增）---
         val versionPropsFile = rootProject.file("version.properties")
         val versionProps = Properties().apply {
-            load(versionPropsFile.inputStream())
+            load(FileInputStream(versionPropsFile))
         }
 
         val oldVersion = versionProps.getProperty("VERSION_NAME", "1.0.0.0")
         val parts = oldVersion.split(".").mapNotNull { it.toIntOrNull() }.toMutableList()
-        // 确保版本号是4段（不足时补0，避免数组越界）
+
+        // 确保4段式版本号
         while (parts.size < 4) parts.add(0)
 
-        // 四段式递增（末位满9进1，如 1.0.0.9 → 1.0.1.0）
+        // 四段式递增，末位满9进1
         var i = parts.lastIndex
         parts[i]++
         while (i > 0 && parts[i] > 9) {
@@ -100,12 +103,12 @@ afterEvaluate {
         }
         val newVersion = parts.joinToString(".")
 
-        // 更新并保存版本号
+        // 更新并保存
         versionProps.setProperty("VERSION_NAME", newVersion)
-        versionProps.store(versionPropsFile.outputStream(), "Updated version: $newVersion")
+        versionProps.store(FileOutputStream(versionPropsFile), "Updated version: $newVersion")
         println("✅ 版本号更新: $oldVersion → $newVersion")
 
-        // --- 更新 changelog.json（自动创建目录/文件）---
+        // --- 更新 changelog.json ---
         val assetsDir = File("app/src/main/assets")
         if (!assetsDir.exists()) {
             assetsDir.mkdirs()
@@ -115,56 +118,60 @@ afterEvaluate {
         val changelogFile = File(assetsDir, "changelog.json")
         val changelogMap = mutableMapOf<String, String>()
 
-        // 读取已有 changelog（处理空文件/格式错误）
         if (changelogFile.exists() && changelogFile.length() > 0) {
             try {
                 val jsonText = changelogFile.readText().trim()
-                // 解析简单 JSON（避免依赖第三方库）
                 jsonText.removeSurrounding("{", "}")
                     .split(",")
                     .filter { it.isNotBlank() }
                     .forEach { kvStr ->
-                        val kv = kvStr.split(":").map { s -> s.trim().removeSurrounding("\"") }
+                        val kv = kvStr.split(":").map { it.trim().removeSurrounding("\"") }
                         if (kv.size == 2) changelogMap[kv[0]] = kv[1]
                     }
             } catch (e: Exception) {
-                println("⚠️  解析 changelog.json 错误，将重新创建文件")
-                changelogFile.delete() // 删除损坏文件
+                println("⚠️ 解析 changelog.json 错误，将重新创建")
+                changelogFile.delete()
             }
         }
 
-        // 追加新版本记录（不存在时添加）
         if (!changelogMap.containsKey(newVersion)) {
             changelogMap[newVersion] = "初始化版本"
         }
 
-        // 写入更新后的 JSON（格式化输出，便于阅读）
         val newJson = changelogMap.entries
-            .sortedByDescending { it.key } // 按版本号降序排列
+            .sortedByDescending { it.key }
             .joinToString(",\n    ") { "\"${it.key}\":\"${it.value}\"" }
         changelogFile.writeText("{\n    $newJson\n}")
         println("✅ changelog.json 更新完成，新增版本: $newVersion")
     } ?: run {
-        // 容错：若找不到 assembleRelease 任务，打印提示（避免构建失败）
-        println("⚠️  未找到 assembleRelease 任务，版本号递增逻辑未绑定")
+        println("⚠️ 未找到 assembleRelease 任务，版本号递增逻辑未绑定")
     }
 }
 
 dependencies {
+    // Assists 库 - 一个第三方工具库，提供基础功能辅助
     implementation("com.github.ven-coder.Assists:assists-base:v3.2.17")
+
+    // AndroidX 核心库 - 提供 Kotlin 扩展和基础功能
     implementation("androidx.core:core-ktx:1.10.1")
+
+    // 生命周期管理 - 帮助管理组件生命周期
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
-    implementation("androidx.activity:activity-compose:1.7.0")
+
+    // Compose 的 Activity 集成
+    implementation("androidx.activity:activity-compose:1.9.3")
+
+    // Jetpack Compose (使用 BOM 统一版本管理)
     implementation(platform("androidx.compose:compose-bom:2023.08.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    implementation("androidx.compose.ui:ui")                // Compose UI 核心
+    implementation("androidx.compose.ui:ui-graphics")       // 图形绘制
+    implementation("androidx.compose.material3:material3")  // Material 3 设计组件
+    implementation("androidx.compose.material:material-icons-extended") // 扩展图标
+
+    // Room 数据库
+    implementation("androidx.room:room-runtime:2.6.1")      // Room 运行时
+    implementation("androidx.room:room-ktx:2.6.1")         // Kotlin 扩展和协程支持
+    kapt("androidx.room:room-compiler:2.6.1")               // Room 注解处理器
+    implementation("androidx.window:window:1.2.0")
+
 }

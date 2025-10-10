@@ -1,17 +1,25 @@
 package cn.wi6.x2.wechat
 
+import cn.wi6.x2.utils.ToastUtil
+import cn.wi6.x2.utils.XLog.clearLogs
 import com.blankj.utilcode.util.AppUtils.launchApp
 import com.ven.assists.AssistsCore
 import com.ven.assists.AssistsCore.click
 import com.ven.assists.AssistsCore.getBoundsInScreen
 import kotlinx.coroutines.delay
 
-suspend fun WeChatLaunch(homeDetection: Boolean = true, maxRetries: Int = 5): Boolean {
+suspend fun WeChatLaunch(homeDetection: Boolean = true, maxRetries: Int = 5) {
+
+    if (!AssistsCore.isAccessibilityServiceEnabled()) {
+        ToastUtil.showLong("请先开启无障碍服务")
+        throw Exception("请先开启无障碍服务")
+    }
+    clearLogs()
 
     launchApp(WeChatConfig.PACKAGE_NAME)
     delay(2000L)
     if (!homeDetection) {
-        return true
+        return
     }
     var retryCount = 0
     while (retryCount < maxRetries) {
@@ -21,7 +29,7 @@ suspend fun WeChatLaunch(homeDetection: Boolean = true, maxRetries: Int = 5): Bo
             if (screen.left > AssistsCore.getX(1080, 340) &&
                 screen.top > AssistsCore.getX(1920, 1850)) {
                 wechatText.parent.parent?.click()
-                return true
+                return
             }
         }
 
