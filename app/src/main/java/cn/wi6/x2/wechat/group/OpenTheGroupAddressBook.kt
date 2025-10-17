@@ -2,20 +2,24 @@ package cn.wi6.x2.wechat.group
 
 import cn.wi6.x2.App.Companion.globalContext
 import cn.wi6.x2.utils.createGroupInfo
-import cn.wi6.x2.utils.XLog.d as XLog
-import cn.wi6.x2.utils.XLog.e as XLogE
-import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.utils.randClicks
+import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.wechat.WeChatConfig.LIST_FRAMEWORK
 import cn.wi6.x2.wechat.scrollListForward
 import com.ven.assists.AssistsCore.findById
 import com.ven.assists.AssistsCore.findByText
+import cn.wi6.x2.utils.XLog.d as XLog
+import cn.wi6.x2.utils.XLog.e as XLogE
 
-// 群聊通讯录检测
-suspend fun groupAddressBookDetection() {
+/**
+ * 群聊通讯录检测
+ * @param whetherToUpdate 默认不更新 若为true则更新数据库
+ */
+suspend fun openTheGroupAddressBook(whetherToUpdate: Boolean = false) {
     val groupsToUpsert = mutableListOf<cn.wi6.x2.utils.GroupInfo>()
     val db = cn.wi6.x2.utils.GroupDatabase(globalContext)
     var shouldStop = false
+    var groupInfo: cn.wi6.x2.utils.GroupInfo? = null
 
     try {
 
@@ -31,15 +35,20 @@ suspend fun groupAddressBookDetection() {
             } else {
 
                 groupNames.forEachIndexed { index, groupNameElement ->
+
                     val groupNameText = groupNameElement.text.toString().trim()
 
-                    // 仅检查本次扫描列表是否重复
-                    if (groupsToUpsert.any { it.currentName == groupNameText }) {
-                        XLogE("⚠ 检测到群名重复：$groupNameText，本次已存在，跳过")
-                        return@forEachIndexed
+                    if (whetherToUpdate){
+                        // 仅检查本次扫描列表是否重复
+                        if (groupsToUpsert.any { it.currentName == groupNameText }) {
+                            XLogE("⚠ 检测到群名重复：$groupNameText，本次已存在，跳过")
+                            return@forEachIndexed
+                        }
+                        groupInfo = createGroupInfo(currentName = groupNameText, saveToContacts = 1)
                     }
-                    val groupInfo = createGroupInfo(currentName = groupNameText, saveToContacts = 1)
-                    groupsToUpsert.add(groupInfo)
+
+
+                    groupInfo?.let { groupsToUpsert.add(it) }
 
                 }
             }
@@ -64,4 +73,5 @@ suspend fun groupAddressBookDetection() {
         }
     }
 }
+
 

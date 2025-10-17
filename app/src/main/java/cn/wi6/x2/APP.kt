@@ -2,14 +2,8 @@ package cn.wi6.x2
 
 import android.app.Application
 import android.content.Context
-import cn.wi6.x2.utils.GroupDatabase
-import cn.wi6.x2.utils.Permission
-import cn.wi6.x2.utils.ToastUtil
 import cn.wi6.x2.utils.XLog
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.ven.assists.AssistsCore
 
 class App : Application() {
     companion object {
@@ -20,8 +14,10 @@ class App : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AssistsCore.init(this)
         globalContext = this
         XLog.init(globalContext)
+
 //
     }
 

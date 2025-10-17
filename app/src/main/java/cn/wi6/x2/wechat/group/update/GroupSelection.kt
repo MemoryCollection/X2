@@ -1,11 +1,9 @@
-package cn.wi6.x2.wechat.group
+package cn.wi6.x2.wechat.group.update
 
 import cn.wi6.x2.App.Companion.globalContext
 import cn.wi6.x2.utils.createGroupInfo
-import cn.wi6.x2.utils.XLog.d as XLog
-import cn.wi6.x2.utils.XLog.e as XLogE
-import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.utils.randClicks
+import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.wechat.WeChatConfig
 import cn.wi6.x2.wechat.WeChatConfig.HOME_MORE_FEATURES
 import cn.wi6.x2.wechat.WeChatConfig.LIST_FRAMEWORK
@@ -17,6 +15,8 @@ import cn.wi6.x2.wechat.getGroupName
 import cn.wi6.x2.wechat.scrollListForward
 import com.ven.assists.AssistsCore.findById
 import com.ven.assists.AssistsCore.findByText
+import cn.wi6.x2.utils.XLog.d as XLog
+import cn.wi6.x2.utils.XLog.e as XLogE
 
 // 群聊选择 查询已存在的群聊
 suspend fun groupSelection() {
@@ -60,7 +60,11 @@ suspend fun groupSelection() {
 
                         XLog("群名称：$groupNameText 群人数：$groupNumber")
                         val groupCategory = getGroupName(groupNameText)
-                        val groupInfo = createGroupInfo(currentName = groupNameText, groupName = groupCategory)
+                        if (groupCategory == null) {
+                            XLogE("⚠ 白名单或人数不符合：$groupNameText，跳过")
+                            return@forEachIndexed
+                        }
+                        val groupInfo = createGroupInfo(currentName = groupNameText, groupName = groupCategory, memberCount = groupNumber.toInt())
                         groupsToUpsert.add(groupInfo)
                     }
                 }

@@ -22,8 +22,9 @@ enum class Screen {
     MAIN, DATABASE // 移除 PERMISSION_REQUEST 屏幕
 }
 
+// 操作状态枚举
 enum class OperationStatus {
-    IDLE, LIKING, GROUP_SENDING, WAITING_PERMISSIONS
+    IDLE, LIKING, GROUP_SENDING, WAITING_PERMISSIONS, UPDATE_GROUP_DETAILS
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,14 +98,7 @@ fun MainScreen(activity: Activity) {
         }
     }
 
-    // 取消所有任务（含权限检测Job）
-    fun cancelAllJobs() {
-        scope.coroutineContext.job.children.forEach { it.cancel() }
-        permissionCheckJob?.cancel()
-        operationStatus = OperationStatus.IDLE
-    }
-
-    // 页面销毁时取消检测Job，避免内存泄漏
+    // 页面销毁时取消检测Job，避免内存泄漏（仅保留权限检测Job的销毁，移除取消任务相关）
     DisposableEffect(Unit) {
         onDispose {
             permissionCheckJob?.cancel()
@@ -137,11 +131,29 @@ fun MainScreen(activity: Activity) {
                         OperationStatus.LIKING -> "正在执行运动点赞..."
                         OperationStatus.GROUP_SENDING -> "正在执行群发操作..."
                         OperationStatus.WAITING_PERMISSIONS -> "等待权限授予（1秒/次检测）..."
+                        OperationStatus.UPDATE_GROUP_DETAILS -> "正在更新群详情..."
                         OperationStatus.IDLE -> if (allPermissionsGranted) "就绪" else "需要授予权限"
                     },
                     permissions = permissionsState,
                     allPermissionsGranted = allPermissionsGranted,
                     operationStatus = operationStatus,
+                    updateGroupDetails = {
+                        if (operationStatus == OperationStatus.IDLE && allPermissionsGranted) {
+                            operationStatus = OperationStatus.UPDATE_GROUP_DETAILS
+                            scope.launch {
+                                try {
+                                    cn.wi6.x2.wechat.updateGroupDetails()
+                                } catch (e: Exception) {
+                                    ToastUtil.showLong("更新群消息失败: ${e.message}")
+                                    XLog.e("更新群消息异常: ${e.message}")
+                                } finally {
+                                    operationStatus = OperationStatus.IDLE
+                                }
+                            }
+                        } else if (!allPermissionsGranted) {
+                            ToastUtil.showShort("请先点击「申请权限」按钮完成授权")
+                        }
+                    },
                     onStartLiking = {
                         if (operationStatus == OperationStatus.IDLE && allPermissionsGranted) {
                             operationStatus = OperationStatus.LIKING
@@ -164,7 +176,7 @@ fun MainScreen(activity: Activity) {
                             operationStatus = OperationStatus.GROUP_SENDING
                             scope.launch {
                                 try {
-                                    cn.wi6.x2.wechat.wechatGroupSend()
+//                                    cn.wi6.x2.wechat.wechatGroupSend()
                                 } catch (e: Exception) {
                                     ToastUtil.showLong("群发操作失败: ${e.message}")
                                     XLog.e("群发操作异常: ${e.message}")
@@ -176,7 +188,6 @@ fun MainScreen(activity: Activity) {
                             ToastUtil.showShort("请先点击「申请权限」按钮完成授权")
                         }
                     },
-                    onCancelAll = ::cancelAllJobs,
                     onRequestPermissions = ::handlePermissionRequest
                 )
 
@@ -191,15 +202,16 @@ fun MainScreen(activity: Activity) {
 
 @Composable
 private fun MainContent(
-    wechatVersion: String,
-    operationStatusText: String,
-    permissions: Map<String, Boolean>,
-    allPermissionsGranted: Boolean,
-    operationStatus: OperationStatus,
-    onStartLiking: () -> Unit,
-    onStartGroupSending: () -> Unit,
-    onCancelAll: () -> Unit,
-    onRequestPermissions: () -> Unit
+    wechatVersion: String, // 微信版本号
+    operationStatusText: String, // 当前操作状态文本
+    permissions: Map<String, Boolean>, // 权限状态映射
+    allPermissionsGranted: Boolean, // 是否全授权
+    operationStatus: OperationStatus, // 当前操作状态
+    updateGroupDetails: () -> Unit, // 更新群消息点击事件
+    onStartLiking: () -> Unit, // 运动点赞点击事件
+    onStartGroupSending: () -> Unit, // 群群发点击事件
+    onRequestPermissions: () -> Unit // 申请权限点击事件
+    // 移除 onCancelAll 参数
 ) {
     Column(
         modifier = Modifier
@@ -232,17 +244,25 @@ private fun MainContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 核心功能按钮（关键变更：取消按钮改为红色）
+        // 核心功能按钮（移除“取消所有任务”按钮相关代码）
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Button(
+                onClick = updateGroupDetails,
+                enabled = operationStatus == OperationStatus.IDLE && allPermissionsGranted,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("更新群消息")
+            }
+
+            Button(
                 onClick = onStartLiking,
                 enabled = operationStatus == OperationStatus.IDLE && allPermissionsGranted,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("执行运动点赞业务")
+                Text("运动点赞")
             }
 
             Button(
@@ -250,20 +270,10 @@ private fun MainContent(
                 enabled = operationStatus == OperationStatus.IDLE && allPermissionsGranted,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("执行群群发操作")
+                Text("群群发")
             }
 
-            // 取消所有操作按钮：设置为红色（使用主题错误色，符合Material设计规范）
-            Button(
-                onClick = onCancelAll,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error, // 红色系背景
-                    contentColor = MaterialTheme.colorScheme.onError  // 白色文字（确保对比度）
-                )
-            ) {
-                Text("暂停微信任务")
-            }
+            // 完全删除“取消所有操作按钮”相关代码块
         }
     }
 }

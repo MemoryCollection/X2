@@ -2,8 +2,6 @@ package cn.wi6.x2.wechat.sport
 
 import cn.wi6.x2.utils.randClicks
 import cn.wi6.x2.utils.randDelay
-import cn.wi6.x2.utils.XLog.e as XLogE
-import cn.wi6.x2.utils.XLog.d as XLog
 import cn.wi6.x2.wechat.WeChatConfig.LIST_OF_SPORTS
 import cn.wi6.x2.wechat.WeChatConfig.SPORTS_HEARTS
 import cn.wi6.x2.wechat.WeChatConfig.SPORT_FILTER_KEYWORD
@@ -13,6 +11,8 @@ import cn.wi6.x2.wechat.WeChatConfig.SPORT_NUMBER
 import cn.wi6.x2.wechat.scrollListForward
 import com.ven.assists.AssistsCore.findById
 import com.ven.assists.AssistsCore.isVisible
+import cn.wi6.x2.utils.XLog.d as XLog
+import cn.wi6.x2.utils.XLog.e as XLogE
 
 // 运动点赞
 suspend fun sportsLikes() {

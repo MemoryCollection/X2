@@ -1,24 +1,18 @@
 package cn.wi6.x2.ui
 
-import androidx.compose.foundation.background
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import cn.wi6.x2.utils.GroupDatabase
-import cn.wi6.x2.utils.GroupInfo
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import android.content.Context
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 /**
@@ -66,7 +60,7 @@ fun DatabaseScreen(context: Context, onBack: () -> Unit) { // 接收返回回调
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Text(group.currentName, modifier = Modifier.weight(1f))
                     Text(group.groupName ?: "未分", modifier = Modifier.weight(1f))
-                    Text("-", modifier = Modifier.weight(1f)) // 人数字段可以后续扩展
+                    Text(group.memberCount?.toString() ?: "N/A", modifier = Modifier.weight(1f))
                     Text(if (group.saveToContacts == 1) "是" else "否", modifier = Modifier.weight(1f))
                 }
                 Divider()

@@ -140,12 +140,6 @@ object Permission {
                 PackageManager.PERMISSION_GRANTED
     }
 
-    /**
-     * 检查悬浮窗权限（Android 14 逻辑不变）
-     */
-    fun hasOverlayPermission(activity: Activity): Boolean {
-        return Settings.canDrawOverlays(activity)
-    }
 
     /**
      * 请求悬浮窗权限
@@ -219,4 +213,18 @@ object Permission {
                 hasManageExternalStoragePermission() &&
                 hasAccessibilityPermission()
     }
+
+    // 在Permission.kt中补充以下方法
+    /**
+     * 检查是否有悬浮窗权限
+     */
+    fun hasOverlayPermission(activity: Activity): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(activity)
+        } else {
+            true // 低版本默认认为有权限
+        }
+    }
+
+    const val OVERLAY_PERMISSION_REQUEST_CODE = 1001
 }

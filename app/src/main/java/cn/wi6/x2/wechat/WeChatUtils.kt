@@ -1,12 +1,11 @@
 package cn.wi6.x2.wechat
 
+import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.wechat.WeChatConfig.GROUP_RULES
 import cn.wi6.x2.wechat.WeChatConfig.WHITELIST
-import cn.wi6.x2.utils.XLog.d as XLog
-import cn.wi6.x2.utils.randDelay
-import com.ven.assists.AssistsCore.findById
 import com.ven.assists.AssistsCore.findByTags
 import com.ven.assists.AssistsCore.scrollForward
+import cn.wi6.x2.utils.XLog.d as XLog
 
 /**
  * 根据群聊名称获取组名

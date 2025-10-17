@@ -4,6 +4,8 @@ object WeChatConfig {
 
     const val PACKAGE_NAME = "com.tencent.mm"
 
+    const val STOP_ALL_TASK = false
+
     //------- 微信运动 -------
     // 运动点赞
     const val SPORTS_HEARTS = "com.tencent.mm:id/dj4"

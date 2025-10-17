@@ -1,7 +1,6 @@
-import java.util.Properties
-import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.*
 
 plugins {
     id("com.android.application")
@@ -15,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "cn.wi6.x2"
-        minSdk = 24
+        minSdk = 34
         targetSdk = 34
 
         // --- 自动创建 version.properties + 默认值 ---
@@ -170,7 +169,8 @@ dependencies {
 
     // Room 数据库
     implementation("androidx.room:room-runtime:2.6.1")      // Room 运行时
-    implementation("androidx.room:room-ktx:2.6.1")         // Kotlin 扩展和协程支持
+    implementation("androidx.room:room-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-process:2.9.4")         // Kotlin 扩展和协程支持
     kapt("androidx.room:room-compiler:2.6.1")               // Room 注解处理器
     implementation("androidx.window:window:1.2.0")
 
