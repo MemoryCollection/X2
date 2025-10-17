@@ -35,15 +35,12 @@
             android:roundIcon="@mipmap/ic_launcher_round"
             android:supportsRtl="true"
             android:theme="@style/Theme.X2"
-            android:requestLegacyExternalStorage="true"
-            android:preserveLegacyExternalStorage="true"
-            tools:targetApi="31">
+            tools:targetApi="34">
 
         <!-- 主活动 -->
         <activity
                 android:name=".MainActivity"
                 android:exported="true"
-                android:label="@string/app_name"
                 android:theme="@style/Theme.X2">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

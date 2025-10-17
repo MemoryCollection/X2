@@ -11,75 +11,93 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 /**
- * 安全随机点击：自动生成偏移量并打印每次点击位置
- * @param minOffset 最小偏移量（像素）
- * @param maxOffsetPercent 最大偏移量占节点宽高的比例（0~1）
- * @param switchWindowIntervalDelay 切换窗口的延迟（ms）
- * @param duration 点击持续时间（ms）
- * @return true 表示点击成功，false 表示点击失败
+ * 安全随机点击（防抖 + 边界保护 + 小节点修正）
+ * @param maxOffsetPercent 最大偏移百分比（默认 0.8f）
+ * @param switchWindowIntervalDelay 窗口切换延迟（默认 250ms）
+ * @param duration 点击持续时间（默认 25ms）
+ * @param debounceInterval 防抖间隔（默认 500ms）
+ * @param retryIfFail 是否重试失败点击（默认 true）
  */
 suspend fun AccessibilityNodeInfo.randClicks(
-    minOffset: Int = 10,
     maxOffsetPercent: Float = 0.8f,
     switchWindowIntervalDelay: Long = 250,
-    duration: Long = 25
+    duration: Long = 25,
+    debounceInterval: Long = 500,
+    retryIfFail: Boolean = true
 ): Boolean {
-    val nodeRect = Rect()
-    this.getBoundsInScreen(nodeRect)
-    val nodeWidth = nodeRect.width()
-    val nodeHeight = nodeRect.height()
+    // 防抖逻辑
+    System.currentTimeMillis().let { now ->
+        if (now - SafeClick.lastClickTime < debounceInterval) {
+            e("点击忽略：防抖触发（间隔=${now - SafeClick.lastClickTime}ms < $debounceInterval ms）")
+            return false
+        }
+        SafeClick.lastClickTime = now
+    }
 
-    if (nodeWidth <= 0 || nodeHeight <= 0) {
-        e("点击失败：节点尺寸无效（宽=$nodeWidth, 高=$nodeHeight）")
+    // 获取并校验节点矩形
+    val rect = Rect().apply { getBoundsInScreen(this) }
+    val (width, height) = rect.width() to rect.height()
+    if (width <= 2 || height <= 2) {
+        e("点击失败：节点尺寸无效（宽=$width, 高=$height）")
         return false
     }
 
-    // 计算 X 偏移
-    val actualXOffset = if (nodeWidth <= minOffset * 2) {
-        nodeWidth / 2f
-    } else {
-        val maxOffset = ((nodeWidth - 2) * maxOffsetPercent).toInt().coerceAtMost(nodeWidth - 2)
-        Random.nextInt(minOffset, maxOffset + 1).toFloat()
-    }
-
-    // 计算 Y 偏移
-    val actualYOffset = if (nodeHeight <= minOffset * 2) {
-        nodeHeight / 2f
-    } else {
-        val maxOffset = ((nodeHeight - 2) * maxOffsetPercent).toInt().coerceAtMost(nodeHeight - 2)
-        Random.nextInt(minOffset, maxOffset + 1).toFloat()
-    }
-
-    // 最终点击坐标，缩紧边界 1px
-    val clickX = (nodeRect.left + actualXOffset).coerceIn(
-        nodeRect.left.toFloat() + 1,
-        nodeRect.right.toFloat() - 2
-    )
-    val clickY = (nodeRect.top + actualYOffset).coerceIn(
-        nodeRect.top.toFloat() + 1,
-        nodeRect.bottom.toFloat() - 2
+    // 计算点击区域与随机偏移
+    val isTiny = width < 40 || height < 40
+    val safeBorder = 2
+    val dynamicOffsetScale = if (isTiny) 0.3f else maxOffsetPercent
+    val (maxXOffset, maxYOffset) = Pair(
+        (width * dynamicOffsetScale).toInt().coerceAtLeast(1),
+        (height * dynamicOffsetScale).toInt().coerceAtLeast(1)
     )
 
-    // 打印点击信息
-    d( "点击坐标：X=$clickX, Y=$clickY | 偏移：X=$actualXOffset, Y=$actualYOffset | 节点范围=$nodeRect")
+    // 计算随机点击坐标（带边界保护）
+    val (cx, cy) = (rect.left + width / 2f) to (rect.top + height / 2f)
+    var clickX = cx + Random.nextInt(-maxXOffset / 2, maxXOffset / 2)
+    var clickY = cy + Random.nextInt(-maxYOffset / 2, maxYOffset / 2)
 
-    return runCatching {
+    // 边界修正
+    val (clampedX, clampedY) = clickX.coerceIn(rect.left + safeBorder.toFloat(), rect.right - safeBorder.toFloat()) to
+            clickY.coerceIn(rect.top + safeBorder.toFloat(), rect.bottom - safeBorder.toFloat())
+    if (clickX != clampedX || clickY != clampedY) {
+        d("⚠️ 点击修正：原坐标(${clickX}, ${clickY}) 限制至 (${clampedX}, ${clampedY})")
+        clickX = clampedX
+        clickY = clampedY
+    }
+
+    d("安全点击 => 坐标: X=$clickX, Y=$clickY | 节点=$rect | 小节点=$isTiny")
+
+    // 点击执行函数
+    suspend fun performClick(): Boolean {
         runMain { AssistsWindowManager.nonTouchableByAll() }
         delay(switchWindowIntervalDelay + Random.nextLong(5, 15))
-
-        val clickResult = AssistsCore.gesture(
+        val ok = AssistsCore.gesture(
             startLocation = floatArrayOf(clickX, clickY),
             endLocation = floatArrayOf(clickX, clickY),
             startTime = 0,
             duration = duration
         )
-
         delay(switchWindowIntervalDelay + Random.nextLong(5, 15))
         runMain { AssistsWindowManager.touchableByAll() }
-
-        if (!clickResult) e("点击失败：手势执行未成功")
-        clickResult
-    }.getOrDefault(false).also {
-        if (!it) e("点击失败：发生异常")
+        return ok
     }
+
+    // 执行点击并处理重试
+    return runCatching { performClick() }.getOrElse {
+        e("点击异常：${it.message}")
+        false
+    }.takeIf { it } ?: if (retryIfFail && isTiny) {
+        delay(100)
+        d("小节点点击失败，重试")
+        performClick()
+    } else {
+        e("点击失败：手势执行无效")
+        false
+    }
+}
+
+/** 全局防抖控制器 */
+object SafeClick {
+    @Volatile
+    var lastClickTime: Long = 0
 }

@@ -4,7 +4,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import cn.wi6.x2.ui.MainScreen
-import cn.wi6.x2.ui.PermissionRequestScreen // 保持原函数名
 import cn.wi6.x2.ui.theme.X2Theme
 import cn.wi6.x2.utils.Permission
 import kotlinx.coroutines.Job

@@ -37,22 +37,20 @@ fun DatabaseScreen(context: Context, onBack: () -> Unit) { // 接收返回回调
         }
     }
 
-//    Column(modifier = Modifier.fillMaxSize()) {
-//        // 添加返回按钮
-//        Row(modifier = Modifier.padding(8.dp)) {
-//            Button(onClick = onBack) {
-//                Icon(
-//                    imageVector = Icons.Default.ArrowBack,
-//                    contentDescription = "返回",
-//                    modifier = Modifier.size(18.dp)
-//                )
-//                Spacer(modifier = Modifier.width(4.dp))
-//                Text("返回主页面")
-//            }
-//        }
-//    }
-
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+
+        Row(modifier = Modifier.padding(8.dp)) {
+            Button(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "返回",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("返回主页面")
+            }
+        }
+
         Text("数据库群信息", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
         Divider()
         // 表头

@@ -2,12 +2,8 @@ package cn.wi6.x2.ui
 
 import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,16 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import cn.wi6.x2.App
+import cn.wi6.x2.utils.Permission
 import cn.wi6.x2.utils.ToastUtil
+import cn.wi6.x2.utils.XLog
 import com.ven.assists.AssistsCore
 import kotlinx.coroutines.*
-import androidx.core.content.ContextCompat
-import cn.wi6.x2.utils.Permission
-import cn.wi6.x2.utils.XLog
 
 enum class Screen {
-    MAIN, DATABASE, PERMISSION_REQUEST
+    MAIN, DATABASE // 移除 PERMISSION_REQUEST 屏幕
 }
 
 enum class OperationStatus {
@@ -34,18 +28,17 @@ enum class OperationStatus {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(
-    activity: Activity
-) {
+fun MainScreen(activity: Activity) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // 状态管理
-    var currentScreen by remember { mutableStateOf(Screen.PERMISSION_REQUEST) }
+    // 初始直接进入主界面
+    var currentScreen by remember { mutableStateOf(Screen.MAIN) }
     var operationStatus by remember { mutableStateOf(OperationStatus.IDLE) }
-    val wechatVersion by remember { mutableStateOf(getWeChatVersion(context)) }
 
-    // 权限管理
+    val wechatVersion = remember { getWeChatVersion(context) }
+
+    // 权限状态管理
     var permissionsState by remember { mutableStateOf(Permission.getPermissionsStatus(activity)) }
     var accessibilityEnabled by remember { mutableStateOf(AssistsCore.isAccessibilityServiceEnabled()) }
     val allPermissionsGranted by derivedStateOf {
@@ -59,80 +52,69 @@ fun MainScreen(
         permissionsState = Permission.getPermissionsStatus(activity)
         if (results.any { !it.value }) {
             ToastUtil.showShort("部分权限未授予，功能可能受限")
-        } else {
-            if (allPermissionsGranted) {
-                currentScreen = Screen.MAIN
-            }
         }
     }
 
-    // 定时检查权限和无障碍服务状态
-    LaunchedEffect(currentScreen) {
-        if (currentScreen == Screen.PERMISSION_REQUEST) {
-            while (true) {
-                delay(2000)
-                permissionsState = Permission.getPermissionsStatus(activity)
-                accessibilityEnabled = AssistsCore.isAccessibilityServiceEnabled()
+    // 权限检测Job：控制高频检测的启动与取消
+    var permissionCheckJob by remember { mutableStateOf<Job?>(null) }
 
-                if (allPermissionsGranted) {
-                    currentScreen = Screen.MAIN
-                    break
+    // 权限申请逻辑
+    fun handlePermissionRequest() {
+        operationStatus = OperationStatus.WAITING_PERMISSIONS
+        val needed = Permission.getNeededPermissions(activity)
+        val standard = needed.filterNot {
+            it in listOf(
+                Permission.OVERLAY_PERMISSION,
+                Permission.MANAGE_STORAGE_PERMISSION,
+                Permission.ACCESSIBILITY_PERMISSION
+            )
+        }
+
+        // 申请普通权限
+        if (standard.isNotEmpty()) permissionLauncher.launch(standard.toTypedArray())
+        // 申请特殊权限（跳转系统设置）
+        if (!Permission.hasOverlayPermission(activity)) Permission.requestOverlayPermission(activity)
+        if (!Permission.hasManageExternalStoragePermission()) Permission.requestManageFilesPermission(activity)
+        if (!accessibilityEnabled) Permission.requestAccessibilityPermission()
+
+        // 启动高频检测（1秒/次）
+        if (permissionCheckJob?.isActive != true) {
+            permissionCheckJob = scope.launch(Dispatchers.Main) {
+                while (isActive) {
+                    permissionsState = Permission.getPermissionsStatus(activity)
+                    accessibilityEnabled = AssistsCore.isAccessibilityServiceEnabled()
+
+                    // 全授权后取消检测
+                    if (allPermissionsGranted) {
+                        XLog.d("✅ 所有权限已授予，停止高频检测")
+                        operationStatus = OperationStatus.IDLE
+                        cancel()
+                    }
+
+                    delay(1000)
                 }
             }
         }
     }
 
-    BackHandler(currentScreen == Screen.DATABASE) {
-        currentScreen = Screen.MAIN
+    // 取消所有任务（含权限检测Job）
+    fun cancelAllJobs() {
+        scope.coroutineContext.job.children.forEach { it.cancel() }
+        permissionCheckJob?.cancel()
+        operationStatus = OperationStatus.IDLE
     }
 
-    val operationStatusText by derivedStateOf {
-        when (operationStatus) {
-            OperationStatus.LIKING -> "正在执行运动点赞..."
-            OperationStatus.GROUP_SENDING -> "正在执行群发操作..."
-            OperationStatus.WAITING_PERMISSIONS -> "等待权限授予..."
-            OperationStatus.IDLE -> if (allPermissionsGranted) "就绪" else "需要授予权限"
-        }
-    }
-
-    fun handlePermissionRequest() {
-        operationStatus = OperationStatus.WAITING_PERMISSIONS
-        val neededPermissions = Permission.getNeededPermissions(activity)
-
-        if (neededPermissions.isNotEmpty()) {
-            val standardPermissions = neededPermissions.filter {
-                it != Permission.OVERLAY_PERMISSION &&
-                        it != Permission.MANAGE_STORAGE_PERMISSION &&
-                        it != Permission.ACCESSIBILITY_PERMISSION
-            }.toTypedArray()
-
-            if (standardPermissions.isNotEmpty()) {
-                permissionLauncher.launch(standardPermissions)
-            }
-        }
-
-        if (!Permission.hasOverlayPermission(activity)) {
-            Permission.requestOverlayPermission(activity)
-        }
-
-        if (!Permission.hasManageExternalStoragePermission()) {
-            Permission.requestManageFilesPermission(activity)
-        }
-
-        if (!accessibilityEnabled) {
-            Permission.requestAccessibilityPermission()
+    // 页面销毁时取消检测Job，避免内存泄漏
+    DisposableEffect(Unit) {
+        onDispose {
+            permissionCheckJob?.cancel()
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "微信助手X2",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text("微信助手X2", fontWeight = FontWeight.Bold) },
                 actions = {
                     if (currentScreen == Screen.MAIN) {
                         TextButton(onClick = { currentScreen = Screen.DATABASE }) {
@@ -141,79 +123,70 @@ fun MainScreen(
                     }
                 }
             )
-        },
-        content = { innerPadding ->
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                when (currentScreen) {
-                    Screen.PERMISSION_REQUEST -> PermissionRequestScreen(
-                        permissionStatus = permissionsState,
-                        onRequestPermissions = ::handlePermissionRequest,
-                        onSkip = { currentScreen = Screen.MAIN }
-                    )
-
-                    Screen.MAIN -> MainContent(
-                        wechatVersion = wechatVersion,
-                        operationStatusText = operationStatusText,
-                        permissions = permissionsState,
-                        allPermissionsGranted = allPermissionsGranted,
-                        operationStatus = operationStatus,
-                        onStartLiking = {
-                            if (operationStatus == OperationStatus.IDLE) {
-                                if (allPermissionsGranted) {
-                                    operationStatus = OperationStatus.LIKING
-                                    scope.launch {
-                                        try {
-                                            cn.wi6.x2.wechat.wechatExerciseSteps()
-                                        } catch (e: Exception) {
-                                            ToastUtil.showLong("运动点赞失败: ${e.message}")
-                                            XLog.e("运动点赞异常: ${e.message}")
-                                        } finally {
-                                            operationStatus = OperationStatus.IDLE
-                                        }
-                                    }
-                                } else {
-                                    ToastUtil.showShort("请先授予所有必要权限")
-                                    currentScreen = Screen.PERMISSION_REQUEST
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when (currentScreen) {
+                Screen.MAIN -> MainContent(
+                    wechatVersion = wechatVersion,
+                    operationStatusText = when (operationStatus) {
+                        OperationStatus.LIKING -> "正在执行运动点赞..."
+                        OperationStatus.GROUP_SENDING -> "正在执行群发操作..."
+                        OperationStatus.WAITING_PERMISSIONS -> "等待权限授予（1秒/次检测）..."
+                        OperationStatus.IDLE -> if (allPermissionsGranted) "就绪" else "需要授予权限"
+                    },
+                    permissions = permissionsState,
+                    allPermissionsGranted = allPermissionsGranted,
+                    operationStatus = operationStatus,
+                    onStartLiking = {
+                        if (operationStatus == OperationStatus.IDLE && allPermissionsGranted) {
+                            operationStatus = OperationStatus.LIKING
+                            scope.launch {
+                                try {
+                                    cn.wi6.x2.wechat.wechatExerciseSteps()
+                                } catch (e: Exception) {
+                                    ToastUtil.showLong("运动点赞失败: ${e.message}")
+                                    XLog.e("运动点赞异常: ${e.message}")
+                                } finally {
+                                    operationStatus = OperationStatus.IDLE
                                 }
                             }
-                        },
-                        onStartGroupSending = {
-                            if (operationStatus == OperationStatus.IDLE) {
-                                if (allPermissionsGranted) {
-                                    operationStatus = OperationStatus.GROUP_SENDING
-                                    scope.launch {
-                                        try {
-                                            cn.wi6.x2.wechat.wechatGroupSend()
-                                        } catch (e: Exception) {
-                                            ToastUtil.showLong("群发操作失败: ${e.message}")
-                                            XLog.e("群发操作异常: ${e.message}")
-                                        } finally {
-                                            operationStatus = OperationStatus.IDLE
-                                        }
-                                    }
-                                } else {
-                                    ToastUtil.showShort("请先授予所有必要权限")
-                                    currentScreen = Screen.PERMISSION_REQUEST
-                                }
-                            }
-                        },
-                        onCancelAll = {
-                            scope.coroutineContext.cancelChildren()
-                            operationStatus = OperationStatus.IDLE
-                        },
-                        onRequestPermissions = {
-                            currentScreen = Screen.PERMISSION_REQUEST
+                        } else if (!allPermissionsGranted) {
+                            ToastUtil.showShort("请先点击「申请权限」按钮完成授权")
                         }
-                    )
+                    },
+                    onStartGroupSending = {
+                        if (operationStatus == OperationStatus.IDLE && allPermissionsGranted) {
+                            operationStatus = OperationStatus.GROUP_SENDING
+                            scope.launch {
+                                try {
+                                    cn.wi6.x2.wechat.wechatGroupSend()
+                                } catch (e: Exception) {
+                                    ToastUtil.showLong("群发操作失败: ${e.message}")
+                                    XLog.e("群发操作异常: ${e.message}")
+                                } finally {
+                                    operationStatus = OperationStatus.IDLE
+                                }
+                            }
+                        } else if (!allPermissionsGranted) {
+                            ToastUtil.showShort("请先点击「申请权限」按钮完成授权")
+                        }
+                    },
+                    onCancelAll = ::cancelAllJobs,
+                    onRequestPermissions = ::handlePermissionRequest
+                )
 
-                    Screen.DATABASE -> DatabaseScreen(
-                        context = context,
-                        onBack = { currentScreen = Screen.MAIN }
-                    )
-                }
+                Screen.DATABASE -> DatabaseScreen(
+                    context = context,
+                    onBack = { currentScreen = Screen.MAIN }
+                )
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -235,11 +208,8 @@ private fun MainContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        // 状态信息
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        // 版本与状态显示
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("微信版本: $wechatVersion", style = MaterialTheme.typography.bodyLarge)
             Spacer(modifier = Modifier.height(8.dp))
             Text("状态: $operationStatusText", style = MaterialTheme.typography.bodyMedium)
@@ -247,28 +217,29 @@ private fun MainContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 权限状态提示
+        // 未全授权时显示：未授权权限列表 + 申请权限按钮
         if (!allPermissionsGranted) {
-            PermissionStatusCard(permissions)
+            PermissionStatusCard(permissions = permissions)
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = onRequestPermissions,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("补全权限")
+                Text("申请所有必要权限")
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 功能按钮区域
+        // 核心功能按钮（关键变更：取消按钮改为红色）
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Button(
                 onClick = onStartLiking,
-                enabled = operationStatus == OperationStatus.IDLE,
+                enabled = operationStatus == OperationStatus.IDLE && allPermissionsGranted,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("执行运动点赞业务")
@@ -276,17 +247,22 @@ private fun MainContent(
 
             Button(
                 onClick = onStartGroupSending,
-                enabled = operationStatus == OperationStatus.IDLE,
+                enabled = operationStatus == OperationStatus.IDLE && allPermissionsGranted,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("执行群群发操作")
             }
 
+            // 取消所有操作按钮：设置为红色（使用主题错误色，符合Material设计规范）
             Button(
                 onClick = onCancelAll,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error, // 红色系背景
+                    contentColor = MaterialTheme.colorScheme.onError  // 白色文字（确保对比度）
+                )
             ) {
-                Text("取消所有操作")
+                Text("暂停微信任务")
             }
         }
     }
@@ -294,20 +270,12 @@ private fun MainContent(
 
 @Composable
 private fun PermissionStatusCard(permissions: Map<String, Boolean>) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                "未授予的权限：",
-                style = MaterialTheme.typography.titleMedium
-            )
+            Text("未授予的权限：", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             permissions.filter { !it.value }.forEach { (name, _) ->
-                Text(
-                    "• $name",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text("• $name", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -315,9 +283,9 @@ private fun PermissionStatusCard(permissions: Map<String, Boolean>) {
 
 private fun getWeChatVersion(context: Context): String {
     return try {
-        val packageInfo = context.packageManager.getPackageInfo("com.tencent.mm", 0)
-        packageInfo.versionName ?: "未知"
-    } catch (e: Exception) {
+        val pkg = context.packageManager.getPackageInfo("com.tencent.mm", 0)
+        pkg.versionName ?: "未知"
+    } catch (_: Exception) {
         "未安装"
     }
 }

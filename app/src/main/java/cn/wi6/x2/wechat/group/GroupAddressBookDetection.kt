@@ -6,17 +6,9 @@ import cn.wi6.x2.utils.XLog.d as XLog
 import cn.wi6.x2.utils.XLog.e as XLogE
 import cn.wi6.x2.utils.randDelay
 import cn.wi6.x2.utils.randClicks
-import cn.wi6.x2.wechat.WeChatConfig
-import cn.wi6.x2.wechat.WeChatConfig.HOME_MORE_FEATURES
 import cn.wi6.x2.wechat.WeChatConfig.LIST_FRAMEWORK
-import cn.wi6.x2.wechat.WeChatConfig.LIST_GROUP_NAME
-import cn.wi6.x2.wechat.WeChatConfig.LIST_GROUP_NUMBER
-import cn.wi6.x2.wechat.WeChatConfig.SELECT_AN_EXISTING_GROUP
-import cn.wi6.x2.wechat.WeChatConfig.START_A_GROUP_CHAT
-import cn.wi6.x2.wechat.getGroupName
 import cn.wi6.x2.wechat.scrollListForward
 import com.ven.assists.AssistsCore.findById
-import com.ven.assists.AssistsCore.findByTags
 import com.ven.assists.AssistsCore.findByText
 
 // 群聊通讯录检测

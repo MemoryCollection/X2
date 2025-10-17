@@ -82,7 +82,7 @@ suspend fun sportsLikes() {
                     likedCount++
                     processedElements.add(uniqueKey)
                     XLog("点赞成功：$sportName（运动数：$numberText）")
-                    randDelay(500, 1100)
+                    randDelay(500, 800)
                 }
             }
 
